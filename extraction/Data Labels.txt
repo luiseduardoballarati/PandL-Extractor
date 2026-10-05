@@ -1,0 +1,136 @@
+Files:
+
+sub → which company, which filing, which period
+pre → the shape of the statement: which lines, in what order, what the company called them
+num → the numbers
+tag → what each concept means
+
+SUB COLUMNS:
+
+adsh:      Accession number (unique ID for the filing)
+cik:       Central Index Key of the registrant
+name:      Name of the reporting entity
+sic:       Standard Industrial Classification code (industry)
+
+-- business address --
+countryba: country
+stprba:    state / province
+cityba:    city
+zipba:     zip code
+bas1:      street address line 1
+bas2:      street address line 2
+baph:      telephone number
+
+-- mailing address (same fields, may differ from business address) --
+countryma: country
+stprma:    state / province
+cityma:    city
+zipma:     zip code
+mas1:      street address line 1
+mas2:      street address line 2
+
+-- registration --
+countryinc: country of incorporation
+stprinc:    state / province of incorporation
+ein:        Employer Identification Number (tax ID)
+former:     previous company name, if changed in the last 150 days
+changed:    date of that name change
+
+afs:       filer status: 1-LAF (large accelerated), 2-ACC (accelerated),
+           3-SRA (smaller reporting accelerated), 4-NON (non-accelerated),
+           5-SML (smaller reporting)
+wksi:      well-known seasoned issuer flag (1/0)
+fye:       fiscal year end, as MMDD (AVAV = 0430)
+
+form:      SEC form type (10-K, 10-Q, ...)
+period:    period end date, rounded to nearest month end (YYYYMMDD)
+fy:        fiscal year the filing reports on, as the company labels it
+fp:        fiscal period: FY, Q1, Q2, Q3, Q4
+filed:     date filed with SEC (YYYYMMDD)
+accepted:  date and time SEC accepted it
+
+prevrpt:   1 = this filing was later amended, so the data is superseded
+detail:    1 = includes footnote-level detail, 0 = face statements only
+instance:  filename of the XBRL instance document
+nciks:     number of companies (CIKs) on this filing
+aciks:     the extra CIKs, when nciks > 1
+
+NUM COLUMNS:
+
+adsh:     Accession number — joins back to `sub` and `pre`
+tag:      The XBRL concept name, e.g. Revenues, NetIncomeLoss.
+          Joins to `tag` (with `version`) for its definition.
+version:  Which taxonomy the tag comes from. Either a standard
+          US-GAAP year (us-gaap/2025) or, if the company invented
+          its own tag, the company's own adsh.
+ddate:    Period end date for this number (YYYYMMDD, month-end)
+qtrs:     How many quarters the number covers.
+          0 = point in time (balance sheet items)
+          1 = one quarter, 4 = full year (income / cash flow items)
+uom:      Unit of measure — USD, shares, pure (ratios), etc.
+segments: Breakdown dimension, if any (e.g. by business segment or
+          product line). Empty = the consolidated total.
+coreg:    Co-registrant, when a filing covers more than one company.
+          Empty = the parent.
+value:    The number itself
+footnote: Any footnote text attached to it
+
+PRE COLUMNS:
+
+adsh:     Accession number — joins to `sub` and `num`
+report:   Which report (statement or note) within the filing this
+          line belongs to. An integer matching the R-file ordering
+          in the filing, e.g. all rows with report=2 are one
+          statement. Use it to separate the balance sheet from the
+          income statement when both share stmt codes across notes.
+line:     Row order within that report. Sort by this to get the
+          statement back in printed top-to-bottom order.
+stmt:     Which financial statement:
+            BS = balance sheet
+            IS = income statement
+            CF = cash flow
+            EQ = statement of stockholders' equity
+            CI = comprehensive income
+            CP = cover page
+            UN = unclassified / other
+inpth:    1 = this line lives in the footnotes, 0 = on the face of
+          the statement itself. Filter to 0 for the main statement.
+rfile:    Rendered file format: H = HTML, X = XML.
+tag:      The XBRL concept name — joins to `num` and `tag`
+version:  The taxonomy the tag comes from — joins alongside `tag`
+plabel:   Preferred label — the human-readable text the company
+          actually printed on the statement, e.g. "Net revenue".
+          This is the column your LLM will read.
+negating: 1 = the label is shown with the sign flipped on the page.
+          The number in `num` is stored one way; the statement
+          displays it the other. Relevant when your arithmetic
+          doesn't add up.
+
+TAG COLUMNS:
+
+tag:      The XBRL concept name — joins to `num` and `pre`
+version:  The taxonomy it belongs to. Together, tag + version is
+          the primary key. The same tag name can exist in
+          us-gaap/2025 and ifrs/2025 with different definitions.
+custom:   1 = the company invented this tag itself.
+          0 = it's a standard tag from US-GAAP or IFRS.
+          Custom tags only exist in that one filing, so they
+          can't be compared across companies.
+abstract: 1 = a heading, not a number. Things like "Operating
+          expenses:" that group the lines below them. These
+          appear in `pre` but have no value in `num`.
+          0 = an actual reported figure.
+datatype: What kind of value it holds — monetary, shares,
+          percent, perShare, duration, etc.
+iord:     Instant or Duration.
+            I = a point in time (balance sheet)
+            D = a span of time (income statement, cash flow)
+          This is the concept-level twin of `qtrs` in `num`.
+crdr:     Natural accounting balance — Credit or Debit.
+            D = debit  (assets, expenses)
+            C = credit (liabilities, equity, revenue)
+          Use this to work out expected signs.
+tlabel:   Standard label for the tag, from the taxonomy.
+          The "official" name, as opposed to `plabel` in `pre`,
+          which is what the company chose to print.
+doc:      Full definition of the concept. Several sentences.
